@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"github.com/majestrate/XD/lib/bittorrent/swarm"
 	"github.com/majestrate/XD/lib/rpc/assets"
 	"github.com/majestrate/XD/lib/rpc/transmission"
@@ -19,6 +20,8 @@ var ErrNoTorrent = errors.New("no such torrent")
 
 const RPCContentType = "text/json; encoding=UTF-8"
 
+const MaxRPCRequestBytes int64 = 1 << 20
+
 // Bittorrent Swarm RPC Handler
 type Server struct {
 	sw           []*swarm.Swarm
@@ -29,7 +32,10 @@ type Server struct {
 
 func NewServer(sw []*swarm.Swarm, host string) *Server {
 	fs := assets.GetAssets()
-	trpc := transmission.NewHandler(sw[0])
+	var trpc http.Handler
+	if len(sw) > 0 && sw[0] != nil {
+		trpc = transmission.NewHandler(sw[0])
+	}
 	if fs == nil {
 		return &Server{
 			sw:           sw,
@@ -68,6 +74,7 @@ func (r *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	} else if req.Method == "POST" {
 		if req.URL.Path == RPCPath {
 			defer req.Body.Close()
+			req.Body = http.MaxBytesReader(w, req.Body, MaxRPCRequestBytes)
 			w.Header().Set("Content-Type", RPCContentType)
 			var body map[string]interface{}
 			err := json.NewDecoder(req.Body).Decode(&body)
@@ -80,7 +87,7 @@ func (r *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				swarmno, ok := body[ParamSwarm]
 				swarmidx := 0
 				if ok {
-					swarmidx, err = strconv.Atoi(fmt.Sprintf("%s", swarmno))
+					swarmidx, err = parseSwarmIndex(swarmno)
 				}
 				if err == nil {
 					switch method {
@@ -126,7 +133,7 @@ func (r *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 						message: err.Error(),
 					}
 				}
-				if swarmidx < len(r.sw) {
+				if swarmidx >= 0 && swarmidx < len(r.sw) && r.sw[swarmidx] != nil {
 					if r.sw[swarmidx].IsOnline() {
 						rr.ProcessRequest(r.sw[swarmidx], rw)
 					} else {
@@ -142,10 +149,15 @@ func (r *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 					rr.ProcessRequest(nil, rw)
 				}
 			} else {
-				// TODO: whatever fix this later
-				w.WriteHeader(http.StatusInternalServerError)
+				var maxErr *http.MaxBytesError
+				if errors.As(err, &maxErr) {
+					http.Error(w, "RPC request too large", http.StatusRequestEntityTooLarge)
+				} else {
+					http.Error(w, "invalid RPC JSON", http.StatusBadRequest)
+				}
 			}
 		} else if req.URL.Path == transmission.RPCPath && r.trpc != nil {
+			req.Body = http.MaxBytesReader(w, req.Body, MaxRPCRequestBytes)
 			r.trpc.ServeHTTP(w, req)
 		} else {
 			w.WriteHeader(http.StatusNotFound)
@@ -153,4 +165,27 @@ func (r *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	} else {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
+}
+
+func parseSwarmIndex(v interface{}) (int, error) {
+	var n int64
+	switch value := v.(type) {
+	case float64:
+		if math.IsNaN(value) || math.IsInf(value, 0) || value < 0 || value >= 9223372036854775808 || math.Trunc(value) != value {
+			return 0, fmt.Errorf("invalid swarm index")
+		}
+		n = int64(value)
+	case string:
+		var err error
+		n, err = strconv.ParseInt(value, 10, 64)
+		if err != nil {
+			return 0, fmt.Errorf("invalid swarm index: %w", err)
+		}
+	default:
+		return 0, fmt.Errorf("invalid swarm index")
+	}
+	if n < 0 || int64(int(n)) != n {
+		return 0, fmt.Errorf("invalid swarm index")
+	}
+	return int(n), nil
 }
