@@ -28,17 +28,11 @@ jobs:
           cache: true
       - name: Toolchain
         run: go version
+      - name: Check module files are tidy
+        run: |
+          go mod tidy -diff
       - name: Verify dependencies
         run: go mod verify
-      - name: Resolve module metadata
-        run: go mod tidy
-      - name: Upload resolved go.sum
-        uses: actions/upload-artifact@v4
-        with:
-          name: resolved-go-module-files
-          path: |
-            go.mod
-            go.sum
       - name: Unit tests
         run: go test ./...
       - name: Vet
@@ -58,8 +52,6 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - name: Resolve module metadata
-        run: go mod tidy
       - name: Race tests
         run: go test -race ./...
 
@@ -77,7 +69,5 @@ jobs:
           cache: true
       - name: Install govulncheck
         run: go install golang.org/x/vuln/cmd/govulncheck@latest
-      - name: Resolve module metadata
-        run: go mod tidy
       - name: Scan
         run: govulncheck ./...
