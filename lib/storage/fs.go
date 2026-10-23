@@ -47,6 +47,7 @@ func (t *fsTorrent) DownloadDir() string {
 }
 
 func (t *fsTorrent) Delete() (err error) {
+	if t.meta != nil { if err = t.meta.ValidatePaths(); err != nil { return err } }
 	err = t.st.FS.RemoveAll(t.st.metainfoFilename(t.ih))
 	if err == nil {
 		err = t.st.FS.RemoveAll(t.st.bitfieldFilename(t.ih))
@@ -58,6 +59,7 @@ func (t *fsTorrent) Delete() (err error) {
 }
 
 func (t *fsTorrent) MoveTo(other string) (err error) {
+	if err = t.meta.ValidatePaths(); err != nil { return err }
 	t.access.Lock()
 	err = t.st.FS.EnsureDir(other)
 	if err == nil {
@@ -89,12 +91,14 @@ func (t *fsTorrent) MoveTo(other string) (err error) {
 }
 
 func (t *fsTorrent) AllocateFile(f metainfo.FileInfo) (err error) {
+	if err = t.meta.ValidatePaths(); err != nil { return err }
 	fname := t.st.FS.Join(t.FilePath(), f.Path.FilePath(""))
 	err = t.st.FS.EnsureFile(fname, f.Length)
 	return
 }
 
 func (t *fsTorrent) Allocate() (err error) {
+	if err = t.meta.ValidatePaths(); err != nil { return err }
 	if t.meta.IsSingleFile() {
 		log.Debugf("file is %d bytes", t.meta.Info.Length)
 		err = t.st.FS.EnsureFile(t.FilePath(), t.meta.Info.Length)
@@ -110,6 +114,7 @@ func (t *fsTorrent) Allocate() (err error) {
 }
 
 func (t *fsTorrent) openfileRead(i metainfo.FileInfo) (f fs.ReadFile, err error) {
+	if err = t.meta.ValidatePaths(); err != nil { return nil, err }
 	var fname string
 	if t.meta.IsSingleFile() {
 		fname = t.FilePath()
@@ -121,6 +126,7 @@ func (t *fsTorrent) openfileRead(i metainfo.FileInfo) (f fs.ReadFile, err error)
 }
 
 func (t *fsTorrent) openfileWrite(i metainfo.FileInfo) (f fs.WriteFile, err error) {
+	if err = t.meta.ValidatePaths(); err != nil { return nil, err }
 	var fname string
 	if t.meta.IsSingleFile() {
 		fname = t.FilePath()
@@ -301,6 +307,7 @@ func (t *fsTorrent) PutInfoBytes(info []byte) (err error) {
 		if err != nil {
 			return
 		}
+		if err = meta.ValidatePaths(); err != nil { return err }
 		ih := meta.Infohash()
 		if !t.ih.Equal(ih) {
 			err = ErrMetaInfoMissmatch
@@ -687,6 +694,7 @@ func (st *FsStorage) OpenTorrent(info *metainfo.TorrentFile) (t Torrent, err err
 }
 
 func (st *FsStorage) openTorrent(info *metainfo.TorrentFile, rootpath string) (t Torrent, err error) {
+	if err = info.ValidatePaths(); err != nil { return nil, err }
 	basepath := st.FS.Join(rootpath, info.TorrentName())
 	if !info.IsSingleFile() {
 		// create directory
