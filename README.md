@@ -1,5 +1,28 @@
 # xP
 
+**xP** is an experimental modernization fork of [XD](https://github.com/majestrate/XD), the lightweight I2P-only BitTorrent client written in Go.
+
+Our first priority is to preserve XD's stability and resource efficiency while auditing security, dependencies, performance, and compatibility with modern I2P and BitTorrent protocols. Future integration as a backend for **rust-mule** is a possibility, not a current feature.
+
+**Status:** M0 reconnaissance. No security audit, compatibility certification, or performance regression testing has been completed for this fork. Do not interpret this fork as security-hardened yet.
+
+## Project documentation
+
+- [Reconnaissance and audit plan](docs/xp-reconnaissance.md)
+- [Modernization roadmap](docs/xp-roadmap.md)
+
+## Upstream and licensing
+
+xP is based on XD by its original contributors. Original history and the [MIT license](LICENSE) are retained. Upstream issues and documentation remain relevant; fork-specific changes will be documented separately.
+
+## Existing XD documentation
+
+The following sections are inherited from upstream and have not yet been fully verified against this fork.
+
+---
+
+# xP
+
 **xP** is a community-maintained modernization fork of [XD](https://github.com/majestrate/XD), an I2P-focused BitTorrent client written in Go.
 
 > **Status: reconnaissance.** This fork has not yet completed a security, performance, or compatibility audit. It is not presently claimed to be more secure or more reliable than upstream XD.
