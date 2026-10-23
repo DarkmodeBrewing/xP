@@ -12,5 +12,5 @@ require (
 require (
 	github.com/kr/fs v0.1.0 // indirect
 	github.com/mattn/kinako v0.0.0-20170717041458-332c0a7e205a // indirect
-	golang.org/x/sys v0.45.0 // indirect
+	golang.org/x/sys v0.47.0 // indirect
 )
