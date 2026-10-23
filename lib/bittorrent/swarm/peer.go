@@ -805,7 +805,7 @@ func (c *PeerConn) handleMetadata(m extensions.Message) {
 			} else {
 				msg.Type = extensions.UTReject
 			}
-			log.Warnf("send ut_metadata type=%q size=%q", msg.Type, msg.Size)
+			log.Warnf("send ut_metadata type=%d size=%d", msg.Type, msg.Size)
 			m.Payload = nil
 			m.PayloadRaw = msg.Bytes()
 			c.Send(m.ToWireMessage())
