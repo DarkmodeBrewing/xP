@@ -55,7 +55,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var resp Response
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err == nil {
-		log.Debugf("trpc request: %q", req)
+		log.Debugf("trpc request: %+v", req)
 		h, ok := s.handlers[req.Method]
 		if ok {
 			resp = h(s.sw, req.Args)

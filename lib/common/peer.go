@@ -58,7 +58,7 @@ func (p *Peer) Resolve(n network.Network) (a net.Addr, err error) {
 			a, err = n.Lookup(p.Compact.String(), fmt.Sprintf("%d", p.Port))
 		}
 	} else {
-		log.Debugf("%q", p)
+		log.Debugf("%+v", p)
 		a = inet.NewAddr(p.IP, fmt.Sprintf("%d", p.Port))
 	}
 	return
