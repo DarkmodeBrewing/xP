@@ -1,104 +1,87 @@
-# XD
+# xP
 
-BitTorrent Client written in GO (as a joke)
+**xP** is an experimental modernization fork of [XD](https://github.com/majestrate/XD), the lightweight I2P-only BitTorrent client written in Go.
 
-![XD](contrib/logos/xd_logo_256x256.png)
+Our first priority is to preserve XD's stability and resource efficiency while auditing security, dependencies, performance, and compatibility with modern I2P and BitTorrent protocols. Future integration as a backend for **rust-mule** is a possibility, not a current feature.
 
-[![Packaging status](https://repology.org/badge/vertical-allrepos/xd-torrent.svg)](https://repology.org/metapackage/xd-torrent)
+**Status:** M0 reconnaissance. No security audit, compatibility certification, or performance regression testing has been completed for this fork. Do not interpret this fork as security-hardened yet.
 
-![Downloads](https://img.shields.io/github/downloads/majestrate/XD/total.svg)
+## Project documentation
 
-![MIT License](https://img.shields.io/github/license/majestrate/XD.svg)
-![Logo is ebin](https://img.shields.io/badge/logo-ebin-brightgreen.svg)
+- [Reconnaissance and audit plan](docs/xp-reconnaissance.md)
+- [Modernization roadmap](docs/xp-roadmap.md)
 
-## Features
+## Upstream and licensing
 
-Current:
+xP is based on XD by its original contributors. Original history and the [MIT license](LICENSE) are retained. Upstream issues and documentation remain relevant; fork-specific changes will be documented separately.
 
-* i2p only, no chances of cross network contamination, aka no way to leak IP.
-* works with [i2pd](https://github.com/purplei2p/i2pd) and Java I2P using the SAM api
-* Magnet URIs
-* memes
+## Existing XD documentation
 
-Soon:
+The following sections are inherited from upstream and have not yet been fully verified against this fork.
 
-* transmission compatible RPC
+---
 
-Eventually:
+# xP
 
-* DHT Support
-* Maggot Support
+**xP** is a community-maintained modernization fork of [XD](https://github.com/majestrate/XD), an I2P-focused BitTorrent client written in Go.
 
-## Dependencies
+> **Status: reconnaissance.** This fork has not yet completed a security, performance, or compatibility audit. It is not presently claimed to be more secure or more reliable than upstream XD.
 
-* GNU Make
-* GO 1.24 or higher
+The first objective is to preserve XD's lightweight operation while establishing reproducible baselines and reviewing dependencies, security boundaries, transport interoperability, and BitTorrent protocol support. Potential future integration with **rust-mule** is exploratory, not an implemented feature.
 
+## Upstream and attribution
 
-## Building
+xP is based on [majestrate/XD](https://github.com/majestrate/XD). Original authorship and copyright remain with the upstream contributors. See [LICENSE](LICENSE) for the MIT license. Contributions suitable for upstream will be considered for upstream submission.
 
-right now the best way to build is with `make`
+## Existing functionality (inherited from XD)
 
-    $ git clone https://github.com/majestrate/XD
-    $ cd XD
-    $ make
+- I2P-focused BitTorrent operation using SAM with i2pd or Java I2P
+- Magnet URI support
+- Embedded web interface (depending on build)
+- CLI and RPC-related components
 
-if you do not want to build with embedded webui instead run:
+These are inherited capabilities, not newly audited guarantees. Actual behavior and protocol compatibility remain to be verified.
 
-    $ make no-webui
+## Build and run (inherited instructions)
 
-you can build with go get using:
+Prerequisites: GNU Make and a Go toolchain compatible with `go.mod` (currently Go **1.25.0**).
 
-    $ go get -u -v github.com/majestrate/XD
-
-please note that using `go get` disables the webui.
-
-or use `go get`:
-
-    $ go get -u -v -tags lokinet github.com/majestrate/XD
-
-### cross compile for Raspberry PI
-
-Set `GOARCH` and `GOOS` when building with make:
-
-    $ make GOARCH=arm GOOS=linux
-
-## Usage
-
-To autogenerate a new config and start:
-
-    $ ./XD torrents.ini
-
-after started put torrent files into `./storage/downloads/` to start downloading
-
-to seed torrents put data files into `./storage/downloads/` first then add torrent files
-
-if you compiled with web ui it will be up at http://127.0.0.1:1776/
-
-To use the RPC Tool symlink `XD` to `XD-CLI`
-
-    $ ln -s XD XD-CLI
-
-to list torrents run:
-
-    $ ./XD-CLI list
-
-to add a torrent from a torrent file on a http server or a magnet link:
-
-    $ ./XD-CLI add http://somehwere.i2p/some_torrent_that_is_not_fake.torrent
-    $ ./XD-CLI add magnet:?xt=urn:btih:somehash&dn=somaname&tr=http://sometracker.i2p/announce.php
-
-Optionally on non windows systems you can install XD to `/usr/local/`
-
-    # make install
-
-Or your home directory, make sure `$HOME/bin` is in your $PATH
-
-    $ make install PREFIX=$HOME
-
-Tunnel length and quanity along with all other i2cp options are set in the i2p section of the configuration:
+```sh
+git clone https://github.com/DarkmodeBrewing/xP.git
+cd xP
+make
 ```
-[i2p]
-inbound.length=1
-outbound.length=1
+
+To build without the embedded web interface:
+
+```sh
+make no-webui
 ```
+
+The Go module and executable are still named after upstream XD. Until any rename is separately planned and tested, follow the existing binary name:
+
+```sh
+./XD torrents.ini
+```
+
+The inherited configuration and runtime behavior are documented in [upstream XD](https://github.com/majestrate/XD#usage). Do not expose the web interface or RPC to untrusted networks without first reviewing their authentication and binding configuration.
+
+## Reconnaissance documents
+
+- [M0 scope and acceptance criteria](docs/modernization-roadmap.md)
+- [Initial architecture inventory](docs/architecture.md)
+- [Security threat-model checklist](docs/security-threat-model.md)
+- [Protocol compatibility audit plan](docs/protocol-compatibility.md)
+- [Performance and reliability baseline plan](docs/performance-baseline.md)
+
+## Working principles
+
+1. Preserve resource efficiency and compatibility; measure before optimizing.
+2. Treat anonymity and network isolation as security properties requiring tests, not marketing guarantees.
+3. Make small, reviewable changes; keep upstream contributions possible.
+4. Audit first, then prioritize verified issues and protocol gaps.
+5. Keep the core daemon independently usable; future rust-mule integration should use a versioned boundary.
+
+## License
+
+MIT; see [LICENSE](LICENSE). The original copyright and license notice must be retained.
