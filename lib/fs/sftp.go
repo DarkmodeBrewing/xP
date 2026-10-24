@@ -261,10 +261,15 @@ func (fs *sftpFS) removeAllDir(root string, c *sftp.Client) error {
 		return err
 	}
 	for idx := range dirs {
-		if dirs[idx].IsDir() {
-			err = fs.removeAllDir(fs.Join(root, dirs[idx].Name()), c)
+		child := path.Join(root, dirs[idx].Name())
+		info, statErr := c.Lstat(child)
+		if statErr != nil {
+			return statErr
+		}
+		if info.IsDir() {
+			err = fs.removeAllDir(child, c)
 		} else {
-			err = c.Remove(fs.Join(root, dirs[idx].Name()))
+			err = c.Remove(child)
 		}
 		if err != nil {
 			return err
@@ -309,7 +314,7 @@ func (fs *sftpFS) Stat(fpath string) (fi os.FileInfo, err error) {
 
 func (fs *sftpFS) RemoveAll(fpath string) error {
 	return fs.ensureConn(func(c *sftp.Client) error {
-		st, err := c.Stat(fpath)
+		st, err := c.Lstat(fpath)
 		if err != nil {
 			return err
 		}
