@@ -2,6 +2,7 @@ package storage
 
 import (
 	"errors"
+	"fmt"
 	"github.com/majestrate/XD/lib/bittorrent"
 	"github.com/majestrate/XD/lib/common"
 	"github.com/majestrate/XD/lib/fs"
@@ -57,6 +58,7 @@ func (t *fsTorrent) DownloadDir() string {
 }
 
 func (t *fsTorrent) Delete() (err error) {
+	if t.meta != nil && t.st.FS == fs.STD { return fmt.Errorf("local torrent deletion requires scoped removal implementation") }
 	if t.meta != nil { if err = t.meta.ValidatePaths(); err != nil { return err } }
 	err = t.st.FS.RemoveAll(t.st.metainfoFilename(t.ih))
 	if err == nil {
@@ -69,6 +71,7 @@ func (t *fsTorrent) Delete() (err error) {
 }
 
 func (t *fsTorrent) MoveTo(other string) (err error) {
+	if t.st.FS == fs.STD { return fmt.Errorf("local torrent move requires scoped rename implementation") }
 	if err = t.meta.ValidatePaths(); err != nil { return err }
 	t.access.Lock()
 	err = t.st.FS.EnsureDir(other)
@@ -168,6 +171,7 @@ func (t *fsTorrent) readFileAt(fi metainfo.FileInfo, b []byte, off int64) (n int
 	// from github.com/anacrolix/torrent
 	var f fs.ReadFile
 	f, err = t.openfileRead(fi)
+	if err != nil { return 0, err }
 	fil := int64(fi.Length)
 	// Limit the read to within the expected bounds of this file.
 	if int64(len(b)) > fil-off {
