@@ -2,7 +2,6 @@ package storage
 
 import (
 	"errors"
-	"fmt"
 	"github.com/majestrate/XD/lib/bittorrent"
 	"github.com/majestrate/XD/lib/common"
 	"github.com/majestrate/XD/lib/fs"
@@ -58,7 +57,17 @@ func (t *fsTorrent) DownloadDir() string {
 }
 
 func (t *fsTorrent) Delete() (err error) {
-	if t.meta != nil && t.st.FS == fs.STD { return fmt.Errorf("local torrent deletion requires scoped removal implementation") }
+	if t.meta != nil && t.st.FS == fs.STD {
+  if err = t.meta.ValidatePaths(); err != nil { return err }
+  t.access.Lock()
+  defer t.access.Unlock()
+  root, openErr := t.localRoot()
+  if openErr != nil { return openErr }
+  defer root.Close()
+  if err = root.RemoveTree(t.meta.Info.Path); err != nil { return err }
+  if err = t.st.FS.RemoveAll(t.st.metainfoFilename(t.ih)); err != nil { return err }
+  return t.st.FS.RemoveAll(t.st.bitfieldFilename(t.ih))
+ }
 	if t.meta != nil { if err = t.meta.ValidatePaths(); err != nil { return err } }
 	err = t.st.FS.RemoveAll(t.st.metainfoFilename(t.ih))
 	if err == nil {
@@ -71,7 +80,34 @@ func (t *fsTorrent) Delete() (err error) {
 }
 
 func (t *fsTorrent) MoveTo(other string) (err error) {
-	if t.st.FS == fs.STD { return fmt.Errorf("local torrent move requires scoped rename implementation") }
+	if t.st.FS == fs.STD {
+  if err = t.meta.ValidatePaths(); err != nil { return err }
+  t.access.Lock()
+  defer t.access.Unlock()
+  source, openErr := t.localRoot()
+  if openErr != nil { return openErr }
+  defer source.Close()
+  if err = t.st.FS.EnsureDir(other); err != nil { return err }
+  destination, openErr := fs.OpenLocalRoot(other)
+  if openErr != nil { return openErr }
+  defer destination.Close()
+  paths := make([]string, 0, len(t.meta.Info.GetFiles()))
+  for _, file := range t.meta.Info.GetFiles() {
+   relative := t.localDataPath(file)
+   if err = source.CopyFileTo(relative, destination, relative); err != nil {
+    for _, copied := range paths { _ = destination.Remove(copied) }
+    return err
+   }
+   paths = append(paths, relative)
+  }
+  // Source data is retained if any destination copy fails.
+  if err = source.RemoveTree(t.meta.Info.Path); err != nil { return err }
+  s := t.st.getSettings(t.ih)
+  s.Put("dir", other)
+  t.st.putSettings(t.ih, s)
+  t.dir = other
+  return nil
+ }
 	if err = t.meta.ValidatePaths(); err != nil { return err }
 	t.access.Lock()
 	err = t.st.FS.EnsureDir(other)
