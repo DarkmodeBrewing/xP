@@ -10,6 +10,7 @@ import (
 	"github.com/majestrate/XD/lib/stats"
 	"github.com/majestrate/XD/lib/sync"
 	"io"
+	"path/filepath"
 )
 
 /* Mutex used in fsTorrent.VerifyAll to ensure that the integrity of each
@@ -41,6 +42,15 @@ type fsTorrent struct {
 	// seeding mutex
 	seedAccess sync.Mutex
 }
+
+// localDataPath is always relative to the configured download root.
+func (t *fsTorrent) localDataPath(i metainfo.FileInfo) string {
+ if t.meta.IsSingleFile() { return t.meta.Info.Path }
+ parts:=append([]string{t.meta.Info.Path}, []string(i.Path)...)
+ return filepath.Join(parts...)
+}
+
+func (t *fsTorrent) localRoot() (*fs.LocalRoot,error) { return fs.OpenLocalRoot(t.dir) }
 
 func (t *fsTorrent) DownloadDir() string {
 	return t.dir
@@ -92,6 +102,10 @@ func (t *fsTorrent) MoveTo(other string) (err error) {
 
 func (t *fsTorrent) AllocateFile(f metainfo.FileInfo) (err error) {
 	if err = t.meta.ValidatePaths(); err != nil { return err }
+	if t.st.FS == fs.STD {
+		r, e := t.localRoot(); if e != nil { return e }; defer r.Close()
+		return r.EnsureFile(t.localDataPath(f), f.Length)
+	}
 	fname := t.st.FS.Join(t.FilePath(), f.Path.FilePath(""))
 	err = t.st.FS.EnsureFile(fname, f.Length)
 	return
@@ -101,6 +115,10 @@ func (t *fsTorrent) Allocate() (err error) {
 	if err = t.meta.ValidatePaths(); err != nil { return err }
 	if t.meta.IsSingleFile() {
 		log.Debugf("file is %d bytes", t.meta.Info.Length)
+		if t.st.FS == fs.STD {
+			r,e:=t.localRoot(); if e!=nil {return e}; defer r.Close()
+			return r.EnsureFile(t.meta.Info.Path,t.meta.Info.Length)
+		}
 		err = t.st.FS.EnsureFile(t.FilePath(), t.meta.Info.Length)
 	} else {
 		for _, f := range t.meta.Info.Files {
@@ -121,6 +139,10 @@ func (t *fsTorrent) openfileRead(i metainfo.FileInfo) (f fs.ReadFile, err error)
 	} else {
 		fname = t.st.FS.Join(t.FilePath(), i.Path.FilePath(""))
 	}
+	if t.st.FS == fs.STD {
+		r,e:=t.localRoot(); if e!=nil {return nil,e}; defer r.Close()
+		return r.OpenRead(t.localDataPath(i))
+	}
 	f, err = t.st.FS.OpenFileReadOnly(fname)
 	return
 }
@@ -132,6 +154,10 @@ func (t *fsTorrent) openfileWrite(i metainfo.FileInfo) (f fs.WriteFile, err erro
 		fname = t.FilePath()
 	} else {
 		fname = t.st.FS.Join(t.FilePath(), i.Path.FilePath(""))
+	}
+	if t.st.FS == fs.STD {
+		r,e:=t.localRoot(); if e!=nil {return nil,e}; defer r.Close()
+		return r.OpenWrite(t.localDataPath(i))
 	}
 	f, err = t.st.FS.OpenFileWriteOnly(fname)
 	return
