@@ -50,7 +50,12 @@ func (s *samSession) Close() error {
 	if s.c == nil {
 		return nil
 	}
-	// Closing the control socket interrupts a blocked lookup worker.\n\t// Do not send to the lookup queue: it may be full or have no reader.\n\terr := s.c.Close()\n\t_ = s.pktconn.Close()\n\ts.c = nil\n\treturn err
+	// Closing the control socket interrupts a blocked lookup worker.
+	// Do not send to the lookup queue: it may be full or have no reader.
+	err := s.c.Close()
+	_ = s.pktconn.Close()
+	s.c = nil
+	return err
 }
 
 func (s *samSession) B32Addr() string {
@@ -69,7 +74,9 @@ func (s *samSession) OpenControlSocket() (n net.Conn, err error) {
 	readbuf := make([]byte, 1)
 	n, err = net.DialTimeout("tcp", s.addr, time.Second)
 	if err == nil {
-		// Bound SAM negotiation; a stalled router must not hang startup.\n		_ = n.SetDeadline(time.Now().Add(time.Second))\n		// make the connection never time out
+		// Bound SAM negotiation; a stalled router must not hang startup.
+		_ = n.SetDeadline(time.Now().Add(time.Second))
+		// make the connection never time out
 		err = n.(*net.TCPConn).SetKeepAlive(true)
 		if err == nil {
 			// send keepalive every 5 seconds
@@ -78,7 +85,8 @@ func (s *samSession) OpenControlSocket() (n net.Conn, err error) {
 		if err != nil {
 			err = nil
 		}
-		_, err = fmt.Fprintf(n, "HELLO VERSION MIN=%s MAX=%s\n", s.minversion, s.maxversion)
+		_, err = fmt.Fprintf(n, "HELLO VERSION MIN=%s MAX=%s
+", s.minversion, s.maxversion)
 		var line string
 		line, err = readLine(n, readbuf)
 		if err == nil {
@@ -93,7 +101,9 @@ func (s *samSession) OpenControlSocket() (n net.Conn, err error) {
 					continue
 				}
 				if text == "RESULT=OK" {
-					// we good\n\t\t\t\t\t_ = n.SetDeadline(time.Time{})\n\t\t\t\t\treturn
+					// we good
+	\t\t\t\t_ = n.SetDeadline(time.Time{})
+	\t\t\t\treturn
 				}
 				err = errors.New(line)
 			}
@@ -119,7 +129,8 @@ func (s *samSession) DialI2P(addr Addr) (c net.Conn, err error) {
 			}
 			port += fmt.Sprintf(" PORT=%d", nport)
 		}
-		_, err = fmt.Fprintf(nc, "STREAM CONNECT ID=%s DESTINATION=%s%s SILENT=false\n", s.Name(), addr.addr, port)
+		_, err = fmt.Fprintf(nc, "STREAM CONNECT ID=%s DESTINATION=%s%s SILENT=false
+", s.Name(), addr.addr, port)
 		var line string
 		// read reply
 		line, err = readLine(nc, readbuf)
@@ -196,7 +207,8 @@ func (s *samSession) runLookups() {
 		if c == nil {
 			return
 		}
-		_, err = fmt.Fprintf(c, "NAMING LOOKUP NAME=%s\n", req.name)
+		_, err = fmt.Fprintf(c, "NAMING LOOKUP NAME=%s
+", req.name)
 		var line string
 		line, err = readLine(c, s.readbuf[:])
 		if err == nil {
@@ -305,7 +317,8 @@ func (s *samSession) createSession(style string) (err error) {
 		optsstr += fmt.Sprintf(" HOST=%s PORT=%s", host, port)
 	}
 
-	_, err = fmt.Fprintf(s.c, "SESSION CREATE STYLE=%s ID=%s SIGNATURE_TYPE=%d DESTINATION=%s%s\n", style, s.Name(), SigType, s.keys.privkey, optsstr)
+	_, err = fmt.Fprintf(s.c, "SESSION CREATE STYLE=%s ID=%s SIGNATURE_TYPE=%d DESTINATION=%s%s
+", style, s.Name(), SigType, s.keys.privkey, optsstr)
 	if err == nil {
 		// read response line
 		var line string
