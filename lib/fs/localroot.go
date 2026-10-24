@@ -68,3 +68,23 @@ func (r *LocalRoot) CopyTo(name string, src io.Reader) (int64,error) {
  if err!=nil { return n,err }
  return n,closeErr
 }
+
+// RemoveTree removes a relative file or directory without following symlinks.
+// The root descriptor confines each operation to its configured directory.
+func (r *LocalRoot) RemoveTree(name string) error {
+ if err := validateRelativePath(name); err != nil { return err }
+ info, err := r.root.Lstat(name)
+ if os.IsNotExist(err) { return nil }
+ if err != nil { return err }
+ if !info.IsDir() { return r.root.Remove(name) }
+ dir, err := r.root.Open(name)
+ if err != nil { return err }
+ entries, readErr := dir.ReadDir(-1)
+ closeErr := dir.Close()
+ if readErr != nil { return readErr }
+ if closeErr != nil { return closeErr }
+ for _, entry := range entries {
+  if err := r.RemoveTree(filepath.Join(name, entry.Name())); err != nil { return err }
+ }
+ return r.root.Remove(name)
+}
