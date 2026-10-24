@@ -88,3 +88,28 @@ func (r *LocalRoot) RemoveTree(name string) error {
  }
  return r.root.Remove(name)
 }
+
+// CopyFileTo copies a regular file into another root without replacing an
+// existing destination. The caller owns source cleanup after all copies succeed.
+func (r *LocalRoot) CopyFileTo(name string, dst *LocalRoot, target string) error {
+ if err := validateRelativePath(name); err != nil { return err }
+ if err := validateRelativePath(target); err != nil { return err }
+ src, err := r.OpenRead(name)
+ if err != nil { return err }
+ defer src.Close()
+ info, err := src.Stat()
+ if err != nil { return err }
+ if !info.Mode().IsRegular() { return fmt.Errorf("source %q is not regular", name) }
+ if err := dst.root.MkdirAll(filepath.Dir(target), 0755); err != nil { return err }
+ out, err := dst.root.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+ if err != nil { return err }
+ _, copyErr := io.Copy(out, src)
+ if copyErr == nil { copyErr = out.Sync() }
+ closeErr := out.Close()
+ if copyErr != nil || closeErr != nil {
+  _ = dst.root.Remove(target)
+  if copyErr != nil { return copyErr }
+  return closeErr
+ }
+ return nil
+}
