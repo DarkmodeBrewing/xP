@@ -50,11 +50,7 @@ func (s *samSession) Close() error {
 	if s.c == nil {
 		return nil
 	}
-	s.lookup <- nil
-	err := s.c.Close()
-	s.pktconn.Close()
-	s.c = nil
-	return err
+	// Closing the control socket interrupts a blocked lookup worker.\n\t// Do not send to the lookup queue: it may be full or have no reader.\n\terr := s.c.Close()\n\t_ = s.pktconn.Close()\n\ts.c = nil\n\treturn err
 }
 
 func (s *samSession) B32Addr() string {
@@ -71,9 +67,9 @@ func (s *samSession) Addr() net.Addr {
 
 func (s *samSession) OpenControlSocket() (n net.Conn, err error) {
 	readbuf := make([]byte, 1)
-	n, err = net.Dial("tcp", s.addr)
+	n, err = net.DialTimeout("tcp", s.addr, time.Second)
 	if err == nil {
-		// make the connection never time out
+		// Bound SAM negotiation; a stalled router must not hang startup.\n		_ = n.SetDeadline(time.Now().Add(time.Second))\n		// make the connection never time out
 		err = n.(*net.TCPConn).SetKeepAlive(true)
 		if err == nil {
 			// send keepalive every 5 seconds
@@ -97,8 +93,7 @@ func (s *samSession) OpenControlSocket() (n net.Conn, err error) {
 					continue
 				}
 				if text == "RESULT=OK" {
-					// we good
-					return
+					// we good\n\t\t\t\t\t_ = n.SetDeadline(time.Time{})\n\t\t\t\t\treturn
 				}
 				err = errors.New(line)
 			}
