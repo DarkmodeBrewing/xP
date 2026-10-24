@@ -262,7 +262,7 @@ func (fs *sftpFS) removeAllDir(root string, c *sftp.Client) error {
 	}
 	for idx := range dirs {
 		if dirs[idx].IsDir() {
-			err = fs.removeAllDir(dirs[idx].Name(), c)
+			err = fs.removeAllDir(fs.Join(root, dirs[idx].Name()), c)
 		} else {
 			err = c.Remove(fs.Join(root, dirs[idx].Name()))
 		}
