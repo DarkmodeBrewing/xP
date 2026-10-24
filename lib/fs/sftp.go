@@ -140,7 +140,7 @@ func (fs *sftpFS) ensureConn(visit func(*sftp.Client) error) error {
 	if err == nil {
 		err = visit(s)
 	} else {
-		err = fs.Close()
+		_ = fs.Close()
 	}
 	return err
 }
@@ -249,7 +249,7 @@ func (fs *sftpFS) EnsureFile(fname string, sz uint64) error {
 					_, err = io.CopyN(f, util.Zero, int64(sz))
 				}
 			}
-			f.Close()
+			if f != nil { if closeErr := f.Close(); err == nil { err = closeErr } }
 		}
 		return err
 	})
@@ -274,15 +274,7 @@ func (fs *sftpFS) removeAllDir(root string, c *sftp.Client) error {
 }
 
 func (fs *sftpFS) Join(paths ...string) string {
-	p := ""
-	err := fs.ensureConn(func(c *sftp.Client) error {
-		p = c.Join(paths...)
-		return nil
-	})
-	if err != nil {
-		panic(err.Error())
-	}
-	return p
+	return path.Join(paths...)
 }
 
 func (fs *sftpFS) Move(oldpath, newpath string) (err error) {
