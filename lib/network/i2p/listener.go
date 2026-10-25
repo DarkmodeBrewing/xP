@@ -4,6 +4,7 @@ import (
 		"errors"
 	"fmt"
 	"net"
+	"strings"
 	"time"
 )
 
@@ -55,7 +56,7 @@ func (l *i2pListener) Accept() (c net.Conn, err error) {
 					c = &I2PConn{
 						c:     nc,
 						laddr: l.laddr,
-						raddr: I2PAddr(line[:len(line)-1]),
+						raddr: I2PAddr(strings.TrimSuffix(line, "\n")),
 					}
 				}
 			}
