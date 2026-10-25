@@ -10,6 +10,9 @@ import (
 	"time"
 )
 
+// samCommandTimeout bounds control-plane negotiation, not established streams.
+const samCommandTimeout = 5 * time.Second
+
 type lookupResp struct {
 	addr Addr
 	err  error
@@ -130,6 +133,7 @@ func (s *samSession) DialI2P(addr Addr) (c net.Conn, err error) {
 			}
 			port += fmt.Sprintf(" PORT=%d", nport)
 		}
+		_ = nc.SetDeadline(time.Now().Add(samCommandTimeout))
 		_, err = fmt.Fprintf(nc, "STREAM CONNECT ID=%s DESTINATION=%s%s SILENT=false\n", s.Name(), addr.addr, port)
 		var line string
 		// read reply
@@ -149,6 +153,7 @@ func (s *samSession) DialI2P(addr Addr) (c net.Conn, err error) {
 				}
 				if upper == "RESULT=OK" {
 					// we are connected
+					_ = nc.SetDeadline(time.Time{})
 					nc.(*net.TCPConn).SetNoDelay(false)
 					nc.(*net.TCPConn).SetWriteBuffer(2400)
 					nc.(*net.TCPConn).SetLinger(0)
@@ -324,6 +329,8 @@ func (s *samSession) createSession(style string) (err error) {
 		optsstr += fmt.Sprintf(" HOST=%s PORT=%s", host, port)
 	}
 
+	_ = s.c.SetDeadline(time.Now().Add(samCommandTimeout))
+	defer s.c.SetDeadline(time.Time{})
 	_, err = fmt.Fprintf(s.c, "SESSION CREATE STYLE=%s ID=%s SIGNATURE_TYPE=%d DESTINATION=%s%s\n", style, s.Name(), SigType, s.keys.privkey, optsstr)
 	if err == nil {
 		// read response line

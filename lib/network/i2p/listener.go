@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"time"
 )
 
 type i2pListener struct {
@@ -36,6 +37,7 @@ func (l *i2pListener) Accept() (c net.Conn, err error) {
 	var nc net.Conn
 	nc, err = l.session.OpenControlSocket()
 	if err == nil {
+		_ = nc.SetDeadline(time.Now().Add(samCommandTimeout))
 		_, err = fmt.Fprintf(nc, "STREAM ACCEPT ID=%s SILENT=false\n", l.session.Name())
 		if err == nil {
 			var line string
@@ -62,6 +64,8 @@ func (l *i2pListener) Accept() (c net.Conn, err error) {
 				}
 			}
 			if err == nil {
+				// After SAM accepts the command, waiting for an inbound peer is intentional.
+				_ = nc.SetDeadline(time.Time{})
 				// read address line
 				line, err = readLine(nc, readbuf)
 				if err == nil {
