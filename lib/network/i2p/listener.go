@@ -1,11 +1,9 @@
 package i2p
 
 import (
-	"bufio"
-	"errors"
+		"errors"
 	"fmt"
 	"net"
-	"strings"
 	"time"
 )
 
@@ -44,24 +42,7 @@ func (l *i2pListener) Accept() (c net.Conn, err error) {
 			// read response line
 			line, err = readLine(nc, readbuf)
 			if err == nil {
-				sc := bufio.NewScanner(strings.NewReader(line))
-				sc.Split(bufio.ScanWords)
-				for sc.Scan() {
-					text := sc.Text()
-					upper := strings.ToUpper(text)
-					if upper == "STREAM" {
-						continue
-					}
-					if upper == "STATUS" {
-						continue
-					}
-					if upper == "RESULT=OK" {
-						// we good
-						break
-					}
-					// error
-					err = errors.New(line)
-				}
+				_, err = verifySAMReply(line, "STREAM", "STATUS")
 			}
 			if err == nil {
 				// After SAM accepts the command, waiting for an inbound peer is intentional.
