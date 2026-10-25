@@ -2,6 +2,7 @@ package i2p
 
 import (
 	"bufio"
+	"time"
 	"fmt"
 	"io"
 	"net"
@@ -68,36 +69,20 @@ func (k *Keyfile) ensure(nc net.Conn) (err error) {
 		_, err = os.Stat(k.fname)
 	}
 	if os.IsNotExist(err) || len(k.fname) == 0 {
-		// no keyfile
+		// Bound both command transmission and key generation response.
+		if err = nc.SetDeadline(time.Now().Add(samCommandTimeout)); err != nil { return err }
+		defer nc.SetDeadline(time.Time{})
 		_, err = fmt.Fprintf(nc, "DEST GENERATE SIGNATURE_TYPE=%d\n", SigType)
-		r := bufio.NewReader(nc)
-		var line string
-		line, err = r.ReadString(10)
-		if err == nil {
-			sc := bufio.NewScanner(strings.NewReader(line))
-			sc.Split(bufio.ScanWords)
-			for sc.Scan() {
-				txt := sc.Text()
-				upper := strings.ToUpper(txt)
-				if upper == "DEST" {
-					continue
-				}
-				if upper == "REPLY" {
-					continue
-				}
-				if strings.HasPrefix(upper, "PUB=") {
-					k.pubkey = txt[4:]
-					continue
-				}
-				if strings.HasPrefix(upper, "PRIV=") {
-					k.privkey = txt[5:]
-					continue
-				}
-			}
-			// store new keys
-			err = k.Store()
-			return
-		}
+		if err != nil { return err }
+		line, readErr := readLine(nc, make([]byte, 1))
+		if readErr != nil { return readErr }
+		attrs, parseErr := verifySAMFields(line, "DEST", "REPLY")
+		if parseErr != nil { return parseErr }
+		pub, hasPub := attrs["PUB"]
+		priv, hasPriv := attrs["PRIV"]
+		if !hasPub || !hasPriv { return fmt.Errorf("DEST REPLY missing PUB or PRIV") }
+		k.pubkey, k.privkey = pub, priv
+		return k.Store()
 	}
 	// load keys
 	err = k.Load()
