@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -29,6 +30,8 @@ type samSession struct {
 	c          net.Conn
 	readbuf    [1]byte
 	lookup     chan *lookupReq
+	done       chan struct{}
+	closeOnce  sync.Once
 	pktconn    I2PPacketConn
 }
 
@@ -47,13 +50,14 @@ func (s *samSession) LocalAddr() net.Addr {
 }
 
 func (s *samSession) Close() error {
-	if s.c == nil {
-		return nil
-	}
-	// Do not send a sentinel into a potentially full lookup queue.
-	err := s.c.Close()
-	_ = s.pktconn.Close()
-	s.c = nil
+	var err error
+	s.closeOnce.Do(func() {
+		close(s.done)
+		if s.c != nil {
+			err = s.c.Close()
+		}
+		_ = s.pktconn.Close()
+	})
 	return err
 }
 
@@ -182,9 +186,17 @@ func (s *samSession) LookupI2P(name string) (a Addr, err error) {
 		replyChnl: make(chan lookupResp),
 		name:      name,
 	}
-	s.lookup <- &req
-	repl := <-req.replyChnl
-	a, err = repl.addr, repl.err
+	select {
+	case <-s.done:
+		return Addr{}, net.ErrClosed
+	case s.lookup <- &req:
+	}
+	select {
+	case <-s.done:
+		return Addr{}, net.ErrClosed
+	case repl := <-req.replyChnl:
+		a, err = repl.addr, repl.err
+	}
 	if err == nil {
 		a.port = port
 	}
@@ -192,53 +204,53 @@ func (s *samSession) LookupI2P(name string) (a Addr, err error) {
 }
 
 func (s *samSession) runLookups() {
-	var err error
-	for err == nil {
-		var resp lookupResp
-		req := <-s.lookup
+	// Any unexpected worker exit invalidates the session and wakes callers.
+	defer s.Close()
+	for {
+		var req *lookupReq
+		select {
+		case <-s.done:
+			return
+		case req = <-s.lookup:
+		}
 		if req == nil {
 			return
 		}
-		c := s.c
-		if c == nil {
-			return
-		}
-		_, err = fmt.Fprintf(c, "NAMING LOOKUP NAME=%s\n", req.name)
-		var line string
-		line, err = readLine(c, s.readbuf[:])
+		var resp lookupResp
+		_, err := fmt.Fprintf(s.c, "NAMING LOOKUP NAME=%s\n", req.name)
 		if err == nil {
-			// okay
-			sc := bufio.NewScanner(strings.NewReader(line))
-			sc.Split(bufio.ScanWords)
-			for sc.Scan() {
-				txt := sc.Text()
-				upper := strings.ToUpper(txt)
-				if upper == "NAMING" {
-					continue
-				}
-				if upper == "REPLY" {
-					continue
-				}
-				if upper == "RESULT=OK" {
-					continue
-				}
-				if strings.HasPrefix(upper, "NAME=") {
-					continue
-				}
-				if strings.HasPrefix(txt, "VALUE=") {
-					// we got it
-					resp.addr = I2PAddr(txt[6:])
+			var line string
+			line, err = readLine(s.c, s.readbuf[:])
+			if err == nil {
+				sc := bufio.NewScanner(strings.NewReader(line))
+				sc.Split(bufio.ScanWords)
+				for sc.Scan() {
+					txt := sc.Text()
+					upper := strings.ToUpper(txt)
+					if upper == "NAMING" || upper == "REPLY" || upper == "RESULT=OK" || strings.HasPrefix(upper, "NAME=") {
+						continue
+					}
+					if strings.HasPrefix(txt, "VALUE=") {
+						resp.addr = I2PAddr(txt[6:])
+						break
+					}
+					resp.err = errors.New(line)
 					break
 				}
-				resp.err = errors.New(line)
-				break
 			}
-		} else {
+		}
+		if err != nil {
 			resp.err = err
 		}
-		req.replyChnl <- resp
+		select {
+		case <-s.done:
+			return
+		case req.replyChnl <- resp:
+		}
+		if err != nil {
+			return
+		}
 	}
-	return
 }
 
 func (s *samSession) Lookup(name, port string) (a net.Addr, err error) {
