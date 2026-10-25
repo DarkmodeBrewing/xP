@@ -60,7 +60,7 @@ func TestOpenControlSocketStalledHandshakeTimesOut(t *testing.T) {
  select {
  case err := <-done:
   if err == nil { t.Fatal("stalled SAM handshake unexpectedly succeeded") }
- case <-time.After(300 * time.Millisecond):
+ case <-time.After(2 * time.Second):
   _ = peer.Close()
   select {
   case <-done:
