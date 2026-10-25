@@ -92,7 +92,9 @@ func (s *samSession) OpenControlSocket() (n net.Conn, err error) {
 		}
 		_, err = fmt.Fprintf(n, "HELLO VERSION MIN=%s MAX=%s\n", s.minversion, s.maxversion)
 		var line string
-		line, err = readLine(n, readbuf)
+		if err == nil {
+			line, err = readLine(n, readbuf)
+		}
 		if err == nil {
 			_, err = verifySAMReply(line, "HELLO", "REPLY")
 			if err == nil {
@@ -124,8 +126,9 @@ func (s *samSession) DialI2P(addr Addr) (c net.Conn, err error) {
 		_ = nc.SetDeadline(time.Now().Add(samCommandTimeout))
 		_, err = fmt.Fprintf(nc, "STREAM CONNECT ID=%s DESTINATION=%s%s SILENT=false\n", s.Name(), addr.addr, port)
 		var line string
-		// read reply
-		line, err = readLine(nc, readbuf)
+		if err == nil {
+			line, err = readLine(nc, readbuf)
+		}
 		if err == nil {
 			_, err = verifySAMReply(line, "STREAM", "STATUS")
 			if err == nil {
