@@ -50,9 +50,9 @@ func (s *samSession) Close() error {
 	if s.c == nil {
 		return nil
 	}
-	s.lookup <- nil
+	// Do not send a sentinel into a potentially full lookup queue.
 	err := s.c.Close()
-	s.pktconn.Close()
+	_ = s.pktconn.Close()
 	s.c = nil
 	return err
 }
@@ -71,8 +71,9 @@ func (s *samSession) Addr() net.Addr {
 
 func (s *samSession) OpenControlSocket() (n net.Conn, err error) {
 	readbuf := make([]byte, 1)
-	n, err = net.Dial("tcp", s.addr)
+	n, err = net.DialTimeout("tcp", s.addr, time.Second)
 	if err == nil {
+		_ = n.SetDeadline(time.Now().Add(time.Second))
 		// make the connection never time out
 		err = n.(*net.TCPConn).SetKeepAlive(true)
 		if err == nil {
@@ -98,6 +99,7 @@ func (s *samSession) OpenControlSocket() (n net.Conn, err error) {
 				}
 				if text == "RESULT=OK" {
 					// we good
+					_ = n.SetDeadline(time.Time{})
 					return
 				}
 				err = errors.New(line)
