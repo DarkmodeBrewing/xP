@@ -1,11 +1,9 @@
 package i2p
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
 	"net"
-	"strings"
 	"sync"
 	"time"
 )
@@ -200,21 +198,13 @@ func (s *samSession) runLookups() {
 			var line string
 			line, err = readLine(s.c, s.readbuf[:])
 			if err == nil {
-				sc := bufio.NewScanner(strings.NewReader(line))
-				sc.Split(bufio.ScanWords)
-				for sc.Scan() {
-					txt := sc.Text()
-					upper := strings.ToUpper(txt)
-					if upper == "NAMING" || upper == "REPLY" || upper == "RESULT=OK" || strings.HasPrefix(upper, "NAME=") {
-						continue
-					}
-					if strings.HasPrefix(txt, "VALUE=") {
-						resp.addr = I2PAddr(txt[6:])
-						break
-					}
-					resp.err = errors.New(line)
-					break
+				var attrs map[string]string
+				attrs, err = verifySAMReply(line, "NAMING", "REPLY")
+				if err == nil {
+					value, ok := attrs["VALUE"]
+					if !ok { err = errors.New("NAMING REPLY missing VALUE") } else { resp.addr = I2PAddr(value) }
 				}
+
 			}
 		}
 		if err != nil {
