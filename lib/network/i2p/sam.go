@@ -94,22 +94,10 @@ func (s *samSession) OpenControlSocket() (n net.Conn, err error) {
 		var line string
 		line, err = readLine(n, readbuf)
 		if err == nil {
-			sc := bufio.NewScanner(strings.NewReader(line))
-			sc.Split(bufio.ScanWords)
-			for sc.Scan() {
-				text := strings.ToUpper(sc.Text())
-				if text == "HELLO" {
-					continue
-				}
-				if text == "REPLY" {
-					continue
-				}
-				if text == "RESULT=OK" {
-					// we good
-					_ = n.SetDeadline(time.Time{})
-					return
-				}
-				err = errors.New(line)
+			_, err = verifySAMReply(line, "HELLO", "REPLY")
+			if err == nil {
+				_ = n.SetDeadline(time.Time{})
+				return
 			}
 		}
 		n.Close()
@@ -139,32 +127,14 @@ func (s *samSession) DialI2P(addr Addr) (c net.Conn, err error) {
 		// read reply
 		line, err = readLine(nc, readbuf)
 		if err == nil {
-			// parse reply
-			sc := bufio.NewScanner(strings.NewReader(line))
-			sc.Split(bufio.ScanWords)
-			for sc.Scan() {
-				txt := sc.Text()
-				upper := strings.ToUpper(txt)
-				if upper == "STREAM" {
-					continue
-				}
-				if upper == "STATUS" {
-					continue
-				}
-				if upper == "RESULT=OK" {
-					// we are connected
-					_ = nc.SetDeadline(time.Time{})
-					nc.(*net.TCPConn).SetNoDelay(false)
-					nc.(*net.TCPConn).SetWriteBuffer(2400)
-					nc.(*net.TCPConn).SetLinger(0)
-					c = &I2PConn{
-						c:     nc,
-						laddr: s.keys.Addr(),
-						raddr: addr,
-					}
-					return
-				}
-				err = errors.New(line)
+			_, err = verifySAMReply(line, "STREAM", "STATUS")
+			if err == nil {
+				_ = nc.SetDeadline(time.Time{})
+				nc.(*net.TCPConn).SetNoDelay(false)
+				nc.(*net.TCPConn).SetWriteBuffer(2400)
+				nc.(*net.TCPConn).SetLinger(0)
+				c = &I2PConn{c: nc, laddr: s.keys.Addr(), raddr: addr}
+				return
 			}
 		}
 		nc.Close()
@@ -337,24 +307,7 @@ func (s *samSession) createSession(style string) (err error) {
 		var line string
 		line, err = readLine(s.c, s.readbuf[:])
 		if err == nil {
-			// parse response line
-			sc := bufio.NewScanner(strings.NewReader(line))
-			sc.Split(bufio.ScanWords)
-			for sc.Scan() {
-				text := sc.Text()
-				upper := strings.ToUpper(text)
-				if upper == "SESSION" {
-					continue
-				}
-				if upper == "STATUS" {
-					continue
-				}
-				if upper == "RESULT=OK" {
-					// we good
-					return
-				}
-				err = errors.New(line)
-			}
+			_, err = verifySAMReply(line, "SESSION", "STATUS")
 		}
 	}
 	return
